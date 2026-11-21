@@ -1,0 +1,10 @@
+create extension if not exists pgcrypto;
+create table if not exists public.stat_questions(id uuid primary key default gen_random_uuid(),prompt text not null,context text,answer numeric not null,unit text not null default '',season text,source_name text not null,source_url text not null,scope text not null default 'BBL',active boolean not null default false,created_at timestamptz not null default now(),constraint source_url_http check(source_url ~ '^https?://'));
+create table if not exists public.stat_challenges(id uuid primary key default gen_random_uuid(),challenge_date date,mode text not null check(mode in('daily','super_over')),created_at timestamptz not null default now());
+create unique index if not exists one_daily_challenge_per_date on public.stat_challenges(challenge_date) where mode='daily';
+create table if not exists public.stat_challenge_questions(challenge_id uuid not null references public.stat_challenges(id) on delete cascade,question_id uuid not null references public.stat_questions(id),position smallint not null,primary key(challenge_id,position),unique(challenge_id,question_id));
+create table if not exists public.stat_scores(id uuid primary key default gen_random_uuid(),challenge_id uuid not null references public.stat_challenges(id),nickname text not null check(char_length(nickname) between 2 and 18),score integer not null check(score>=0),accuracy numeric(5,2) not null,correct_count smallint not null,created_at timestamptz not null default now());
+create index if not exists stat_scores_challenge_score on public.stat_scores(challenge_id,score desc,created_at asc);
+alter table public.stat_questions enable row level security;alter table public.stat_challenges enable row level security;alter table public.stat_challenge_questions enable row level security;alter table public.stat_scores enable row level security;
+revoke all on public.stat_questions,public.stat_challenges,public.stat_challenge_questions,public.stat_scores from anon,authenticated;
+-- All access is through the Edge Function using the service-role key. Never expose that key in the browser.
